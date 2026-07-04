@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart City - Thu Duc Advanced SCADA</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            margin: 0; padding: 0; min-height: 100vh; 
+            background-image: url('background.jpg'); 
+            background-size: cover; background-position: center; background-attachment: fixed; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: white; 
+            display: flex; flex-direction: column; 
+        }
+        
+        .overlay { 
+            width: 100%; flex-grow: 1; background-color: rgba(10, 15, 30, 0.88); 
+            display: flex; flex-direction: column; padding: 20px; 
+        }
+
+        /* ====== HEADER & FOOTER ====== */
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { font-size: 2rem; font-weight: bold; color: #00ffcc; letter-spacing: 2px; text-transform: uppercase; text-shadow: 0 0 15px rgba(0,255,204,0.6); margin: 0; }
+        .footer { text-align: center; padding: 15px; margin-top: auto; font-size: 1.2rem; font-weight: bold; color: #00ffcc; letter-spacing: 2px; border-top: 1px solid rgba(255,255,255,0.05); }
+
+        /* ====== MAIN LAYOUT ====== */
+        .main-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 2fr 1fr; 
+            gap: 25px; flex-grow: 1; 
+        }
+        .col-block { display: flex; flex-direction: column; gap: 15px; }
+
+        /* ====== BLOCK 1: NAVIGATION, ANALYTICS, TRAFFIC & CLOCK ====== */
+        .nav-menu { display: flex; flex-direction: column; gap: 12px; }
+        .nav-link {
+            background: rgba(0, 0, 0, 0.4); color: #fff; text-decoration: none; padding: 14px 18px;
+            border-radius: 8px; font-weight: bold; font-size: 1rem; border-left: 4px solid #00ffcc;
+            transition: all 0.3s ease; display: flex; align-items: center; justify-content: space-between;
+        }
+        .nav-link:hover { background: rgba(0, 255, 204, 0.15); transform: translateX(4px); }
+
+        .analytics-box { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 15px; margin-top: 5px; }
+        .analytics-box h3 { margin: 0 0 12px 0; font-size: 1rem; color: #00ffcc; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; }
+        .stat-item { display: flex; justify-content: space-between; padding: 8px 0; font-size: 0.95rem; border-bottom: 1px dashed rgba(255,255,255,0.05); }
+        .stat-item span:first-child { color: #aaa; }
+        .stat-item span:last-child { font-weight: bold; color: #fff; }
+
+        /* Bảng Giao thông Thủ Đức (Tính năng mới lấp chỗ trống) */
+        .traffic-box { background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 15px; }
+        .traffic-box h3 { margin: 0 0 12px 0; font-size: 1rem; color: #ffb142; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; }
+        .traffic-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; font-size: 0.9rem; border-bottom: 1px dashed rgba(255,255,255,0.05); }
+        .traffic-loc { color: #eee; font-weight: bold; }
+        .status-badge { padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.8rem; transition: 0.5s; }
+        .status-clear { background: rgba(0, 255, 204, 0.15); color: #00ffcc; border: 1px solid #00ffcc; box-shadow: 0 0 8px rgba(0,255,204,0.3); }
+        .status-slow { background: rgba(255, 177, 66, 0.15); color: #ffb142; border: 1px solid #ffb142; box-shadow: 0 0 8px rgba(255,177,66,0.3); }
+        .status-jam { background: rgba(255, 71, 87, 0.15); color: #ff4757; border: 1px solid #ff4757; box-shadow: 0 0 8px rgba(255,71,87,0.3); }
+
+        .clock-box { 
+            background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.05); 
+            border-radius: 12px; padding: 20px 15px; text-align: center; 
+            margin-top: auto; box-shadow: inset 0 0 20px rgba(0,0,0,0.4);
+        }
+        .clock-box .time { font-size: 2.2rem; font-weight: bold; color: #fff; text-shadow: 0 0 12px #00ffcc; letter-spacing: 3px; font-family: 'Courier New', Courier, monospace; margin-bottom: 5px; }
+        .clock-box .date { font-size: 0.95rem; color: #00bcd4; text-transform: uppercase; letter-spacing: 1.5px; font-weight: bold; }
+
+        /* ====== BLOCK 2: ĐÓNG KHUNG TRUNG TÂM SCADA ====== */
+        .center-frame { 
+            background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(15px); 
+            border: 1px solid rgba(0, 255, 204, 0.25); border-radius: 16px; padding: 20px; 
+            box-shadow: inset 0 0 30px rgba(0,0,0,0.6), 0 12px 40px rgba(0,0,0,0.7);
+            display: flex; flex-direction: column; justify-content: space-between; gap: 20px;
+        }
+        
+        .sensors-row { display: flex; justify-content: space-between; align-items: center; }
+        .sensor-card { display: flex; flex-direction: column; align-items: center; text-align: center; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 10px; width: 31%; border: 1px solid rgba(255,255,255,0.03); }
+        .sensor-card img { height: 42px; object-fit: contain; margin-bottom: 8px; }
+        .sensor-card h4 { margin: 0 0 5px 0; font-size: 0.95rem; color: #aaa; }
+        .sensor-card .val { font-size: 1.8rem; font-weight: bold; color: #00ffcc; text-shadow: 0 0 10px rgba(0,255,204,0.4); }
+
+        /* Full Console Box (Phục hồi lại toàn màn hình) */
+        .console-box { 
+            width: 100%; height: 210px; background: rgba(5, 8, 20, 0.85); 
+            border: 1px solid rgba(0, 255, 204, 0.2); border-radius: 10px; padding: 15px; 
+            font-family: 'Courier New', Courier, monospace; font-size: 0.85rem; color: #00ffcc; 
+            overflow-y: auto; box-shadow: inset 0 0 15px rgba(0,0,0,0.8);
+        }
+        .console-log { margin: 5px 0; line-height: 1.5; word-break: break-all; }
+        .log-time { color: #7f8c8d; font-weight: bold; margin-right: 8px; }
+        .log-info { color: #00ffcc; }
+        .log-cmd { color: #00bcd4; font-weight: bold; }
+        .log-warn { color: #ff4757; font-weight: bold; text-shadow: 0 0 8px rgba(255,71,87,0.4); }
+
+        .devices-row { display: flex; justify-content: space-between; align-items: center; }
+        .device-card { display: flex; flex-direction: column; align-items: center; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 10px; width: 31%; border: 1px solid rgba(255,255,255,0.03); }
+        .device-card img.dev-icon { height: 50px; object-fit: contain; margin-bottom: 12px; }
+        .device-card h4 { margin: 0 0 12px 0; font-size: 0.95rem; color: #eee; }
+        
+        .switch-ui { position: relative; display: inline-block; width: 60px; height: 30px; }
+        .switch-ui input { opacity: 0; width: 0; height: 0; }
+        .slider-ui {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #222; transition: .4s; border-radius: 30px; border: 1px solid rgba(255,255,255,0.1);
+        }
+        .slider-ui:before {
+            position: absolute; content: ""; height: 22px; width: 22px; left: 3px; bottom: 3px;
+            background-color: #fff; transition: .4s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+        }
+        input:checked + .slider-ui { background-color: #00ffcc; box-shadow: 0 0 12px rgba(0,255,204,0.4); }
+        input:checked + .slider-ui:before { transform: translateX(30px); background-color: #0a0f1e; }
+
+        .telemetry-panel { 
+            display: flex; justify-content: space-between; background: rgba(0,0,0,0.6); 
+            padding: 10px 15px; border-radius: 8px; font-size: 0.85rem; color: #aaa;
+            border: 1px solid rgba(0,255,204,0.1);
+        }
+        .telemetry-online { color: #00ffcc; font-weight: bold; text-shadow: 0 0 8px #00ffcc; }
+
+        /* ====== BLOCK 3: CHARTS ====== */
+        .chart-wrapper { background: rgba(0, 0, 0, 0.4); border-radius: 10px; padding: 12px; height: 31%; border: 1px solid rgba(255,255,255,0.03); display: flex; flex-direction: column;}
+        .chart-wrapper canvas { width: 100% !important; height: 100% !important; }
+
+        @media (max-width: 1200px) { .main-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+    <div class="overlay">
+        <div class="header">
+            <h1>PHẠM QUỐC THẮNG - ĐẶNG THÀNH DƯƠNG</h1>
+        </div>
+
+        <div class="main-grid">
+            
+            <div class="col-block block-1">
+                <div class="nav-menu">
+                    <a href="https://www.accuweather.com/vi/vn/thu-duc/414495/hourly-weather-forecast/414495" target="_blank" class="nav-link">
+                        <span>🌤️ Dự Báo Thời Tiết</span> <span>➤</span>
+                    </a>
+                    <a href="https://www.iqair.com/vi/air-quality/vietnam/ho-chi-minh-city/thu-duc" target="_blank" class="nav-link">
+                        <span>🌍 Chất Lượng Không Khí</span> <span>➤</span>
+                    </a>
+                </div>
+
+                <div class="analytics-box">
+                    <h3>📊 Thống kê cực đại hôm nay</h3>
+                    <div class="stat-item"><span>Nhiệt độ Max:</span><span id="stat-max-temp">--°C</span></div>
+                    <div class="stat-item"><span>Độ ẩm Min:</span><span id="stat-min-humi">--%</span></div>
+                    <div class="stat-item"><span>Khí Gas Max:</span><span id="stat-max-gas">-- PPM</span></div>
+                </div>
+
+                <div class="traffic-box">
+                    <h3>🚦 Giám sát giao thông</h3>
+                    <div class="traffic-item">
+                        <span class="traffic-loc">Ngã 4 Thủ Đức</span>
+                        <span class="status-badge status-slow">Ùn ứ</span>
+                    </div>
+                    <div class="traffic-item">
+                        <span class="traffic-loc">Xa lộ Hà Nội</span>
+                        <span class="status-badge status-clear">Thông thoáng</span>
+                    </div>
+                    <div class="traffic-item">
+                        <span class="traffic-loc">Cầu Đồng Nai</span>
+                        <span class="status-badge status-clear">Thông thoáng</span>
+                    </div>
+                    <div class="traffic-item">
+                        <span class="traffic-loc">Võ Văn Ngân</span>
+                        <span class="status-badge status-jam">Kẹt xe</span>
+                    </div>
+                </div>
+
+                <div class="clock-box">
+                    <div class="time" id="sys-time">00:00:00</div>
+                    <div class="date" id="sys-date">Thứ --, --/--/----</div>
+                </div>
+            </div>
+
+            <div class="col-block center-frame">
+                
+                <div class="sensors-row">
+                    <div class="sensor-card">
+                        <img src="temperature.jpg" alt="Temp">
+                        <h4>Nhiệt độ</h4>
+                        <div class="val" id="val-temp">--°C</div>
+                    </div>
+                    <div class="sensor-card">
+                        <img src="humidity.png" alt="Humi">
+                        <h4>Độ ẩm</h4>
+                        <div class="val" id="val-humi" style="color: #00bcd4; text-shadow: 0 0 10px rgba(0,188,212,0.5);">--%</div>
+                    </div>
+                    <div class="sensor-card">
+                        <img src="gas.png" alt="Gas">
+                        <h4>Khí Gas</h4>
+                        <div class="val" id="val-gas" style="color: #ffb142; text-shadow: 0 0 10px rgba(255,177,66,0.5);">-- PPM</div>
+                    </div>
+                </div>
+
+                <div class="console-box" id="scada-console">
+                    <div class="console-log"><span class="log-time">[00:00:00]</span> <span class="log-info">Khởi động lõi SCADA điều khiển thông minh Thủ Đức... Ready.</span></div>
+                </div>
+
+                <div class="devices-row">
+                    <div class="device-card">
+                        <img id="img-siren" class="dev-icon" src="emergency_off-remove.png">
+                        <h4>Còi báo động</h4>
+                        <label class="switch-ui">
+                            <input type="checkbox" id="switch-siren" onchange="toggleDevice('siren', this.checked)">
+                            <span class="slider-ui"></span>
+                        </label>
+                    </div>
+                    
+                    <div class="device-card">
+                        <img id="img-irrigation" class="dev-icon" src="Irrigation_off.png">
+                        <h4>Tưới công viên</h4>
+                        <label class="switch-ui">
+                            <input type="checkbox" id="switch-irrigation" onchange="toggleDevice('irrigation', this.checked)">
+                            <span class="slider-ui"></span>
+                        </label>
+                    </div>
+
+                    <div class="device-card">
+                        <img id="img-streetLight" class="dev-icon" src="lamp_street_off_symbol-remove.png">
+                        <h4>Đèn đường</h4>
+                        <label class="switch-ui">
+                            <input type="checkbox" id="switch-streetLight" onchange="toggleDevice('streetLight', this.checked)">
+                            <span class="slider-ui"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="telemetry-panel">
+                    <div>Mạng phần cứng: <span class="telemetry-online">● ONLINE</span></div>
+                    <div>WiFi RSSI: <span style="color: #00bcd4; font-weight: bold;">-58 dBm</span></div>
+                    <div>Đồng bộ cuối: <span id="last-sync" style="color: #ffb142; font-weight: bold;">--:--:--</span></div>
+                </div>
+
+            </div>
+
+            <div class="col-block block-3">
+                <div class="chart-wrapper"><canvas id="tempChart"></canvas></div>
+                <div class="chart-wrapper"><canvas id="humiChart"></canvas></div>
+                <div class="chart-wrapper"><canvas id="gasChart"></canvas></div>
+            </div>
+
+        </div>
+
+        <div class="footer">
+            PHẠM QUỐC THẮNG - 23161193
+        </div>
+
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+                // ADD API KEY FIREBASE CỦA BẠN VÀO ĐÂY
+        };
+
+        let db = null;
+        try { 
+            const app = initializeApp(firebaseConfig);
+            db = getDatabase(app); 
+            console.log("Đã kết nối Firebase SCADA!");
+        } catch (e) { console.warn("Lỗi Firebase: ", e); }
+
+        // ================= KÍCH HOẠT ĐỒNG HỒ & GIAO THÔNG =================
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('sys-time').innerText = now.toLocaleTimeString('vi-VN', { hour12: false });
+            const options = { weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' };
+            let dateString = now.toLocaleDateString('vi-VN', options);
+            dateString = dateString.charAt(0).toUpperCase() + dateString.slice(1);
+            document.getElementById('sys-date').innerText = dateString;
+        }, 1000);
+
+        // Hiệu ứng giả lập dữ liệu giao thông thay đổi (làm hệ thống trông sống động)
+        const trafficStates = [
+            { class: 'status-clear', text: 'Thông thoáng' },
+            { class: 'status-slow', text: 'Ùn ứ' },
+            { class: 'status-jam', text: 'Kẹt xe' }
+        ];
+        setInterval(() => {
+            const badges = document.querySelectorAll('.traffic-box .status-badge');
+            if(badges.length > 0) {
+                // Chọn ngẫu nhiên một tuyến đường để thay đổi trạng thái
+                const randomIdx = Math.floor(Math.random() * badges.length);
+                const randomState = trafficStates[Math.floor(Math.random() * trafficStates.length)];
+                badges[randomIdx].className = `status-badge ${randomState.class}`;
+                badges[randomIdx].innerText = randomState.text;
+            }
+        }, 8000); // Thay đổi mỗi 8 giây
+
+        // ================= LÕI ENGINE IN LOG CONSOLE =================
+        function addConsoleLog(message, type = 'info') {
+            const consoleEl = document.getElementById('scada-console');
+            if(!consoleEl) return;
+            
+            const timestamp = new Date().toLocaleTimeString('vi-VN', { hour12: false });
+            const logRow = document.createElement('div');
+            logRow.className = 'console-log';
+            
+            let cssClass = 'log-info';
+            if (type === 'warn') cssClass = 'log-warn';
+            if (type === 'cmd') cssClass = 'log-cmd';
+            
+            logRow.innerHTML = `<span class="log-time">[${timestamp}]</span> <span class="${cssClass}">${message}</span>`;
+            consoleEl.appendChild(logRow);
+            
+            if (consoleEl.children.length > 40) {
+                consoleEl.removeChild(consoleEl.firstChild);
+            }
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        // ================= ĐIỀU KHIỂN THIẾT BỊ 2 CHIỀU =================
+        const deviceImages = {
+            siren: { on: "emergency_on-remove.png", off: "emergency_off-remove.png" },
+            irrigation: { on: "Irrigation_on.png", off: "Irrigation_off.png" },
+            streetLight: { on: "lamp_street_on_symbol-remove.png", off: "lamp_street_off_symbol-remove.png" }
+        };
+
+        function updateUI(device, isOn) {
+            const imgElement = document.getElementById(`img-${device}`);
+            if(imgElement) {
+                imgElement.src = isOn ? deviceImages[device].on : deviceImages[device].off;
+            }
+            const toggleElement = document.getElementById(`switch-${device}`);
+            if(toggleElement) {
+                toggleElement.checked = isOn;
+            }
+        }
+
+        window.toggleDevice = function(device, isChecked) {
+            if (!db) return;
+            update(ref(db), { [`SmartCity/ThuDuc/Controls/${device}`]: isChecked ? 1 : 0 });
+        }
+
+        // ================= BIẾN LƯU TRỮ ĐỂ TÍNH TOÁN CỰC ĐẠI ANALYTICS =================
+        let maxTemp = -999;
+        let minHumi = 999;
+        let maxGas = -999;
+        let prevControls = { siren: null, irrigation: null, streetLight: null };
+
+        // ================= CẤU HÌNH GRAPH BIỂU ĐỒ =================
+        Chart.defaults.color = '#e0e0e0';
+        Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.05)';
+        const chartOpt = { responsive: true, maintainAspectRatio: false, animation: { duration: 350 }, plugins: { legend: { display: false } } };
+
+        let labels = ['-30s', '-25s', '-20s', '-15s', '-10s', '-5s', 'Now'];
+        
+        let tChart = new Chart(document.getElementById('tempChart'), { 
+            type: 'line', data: { labels: labels, datasets: [{ label: 'Nhiệt độ', data: [0,0,0,0,0,0,0], borderColor: '#00ffcc', backgroundColor: 'rgba(0, 255, 204, 0.15)', borderWidth: 2, fill: true, tension: 0.4 }] }, 
+            options: { ...chartOpt, plugins: { title: { display: true, text: 'XU HƯỚNG NHIỆT ĐỘ (°C)', color: '#fff', font: { weight: 'bold' } } } } 
+        });
+
+        let hChart = new Chart(document.getElementById('humiChart'), { 
+            type: 'bar', data: { labels: labels, datasets: [{ label: 'Độ ẩm', data: [0,0,0,0,0,0,0], backgroundColor: '#00bcd4', borderRadius: 2 }] }, 
+            options: { ...chartOpt, plugins: { title: { display: true, text: 'XU HƯỚNG ĐỘ ẨM (%)', color: '#fff', font: { weight: 'bold' } } } } 
+        });
+
+        let gChart = new Chart(document.getElementById('gasChart'), { 
+            type: 'line', data: { labels: labels, datasets: [{ label: 'Khí Gas', data: [0,0,0,0,0,0,0], borderColor: '#ffb142', backgroundColor: 'rgba(255, 177, 66, 0.15)', borderWidth: 2, fill: true, tension: 0.3 }] }, 
+            options: { ...chartOpt, plugins: { title: { display: true, text: 'XU HƯỚNG KHÍ GAS (PPM)', color: '#fff', font: { weight: 'bold' } } } } 
+        });
+
+        function pushLiveSensorData(t, h, a) {
+            document.getElementById('val-temp').innerText = t + "°C";
+            document.getElementById('val-humi').innerText = h + "%";
+            document.getElementById('val-gas').innerText = a;
+
+            addConsoleLog(`Nhận gói tin: Temp=${t}°C | Humi=${h}% | Gas=${a} PPM`, 'info');
+
+            if (t > maxTemp) { maxTemp = t; document.getElementById('stat-max-temp').innerText = maxTemp + "°C"; }
+            if (h < minHumi) { minHumi = h; document.getElementById('stat-min-humi').innerText = minHumi + "%"; }
+            if (a > maxGas) { maxGas = a; document.getElementById('stat-max-gas').innerText = maxGas + " PPM"; }
+
+            if (a > 5000) { addConsoleLog(`CRITICAL WARNING: Phát hiện nồng độ khí GAS rò rỉ vượt ngưỡng an toàn (${a} PPM)!`, 'warn'); }
+            if (t > 40) { addConsoleLog(`CRITICAL WARNING: Nhiệt độ Thủ Đức chạm mốc nguy hiểm (${t}°C)!`, 'warn'); }
+
+            const nowTime = new Date().toLocaleTimeString('vi-VN', { hour12: false });
+            document.getElementById('last-sync').innerText = nowTime;
+
+            labels.push(nowTime); if (labels.length > 7) labels.shift();
+
+            let tArr = tChart.data.datasets[0].data; tArr.push(t); if(tArr.length>7) tArr.shift(); tChart.update();
+            let hArr = hChart.data.datasets[0].data; hArr.push(h); if(hArr.length>7) hArr.shift(); hChart.update();
+            let gArr = gChart.data.datasets[0].data; gArr.push(a); if(gArr.length>7) gArr.shift(); gChart.update();
+        }
+
+        // ================= LẮNG NGHE REALTIME DATABASE =================
+        function listenToFirebase() {
+            if (!db) return;
+            
+            onValue(ref(db, 'SmartCity/ThuDuc/Controls'), (snap) => {
+                const c = snap.val();
+                if (c) { 
+                    if(prevControls.siren !== null && prevControls.siren !== c.siren) {
+                        addConsoleLog(`COMMAND: Lệnh còi báo động thay đổi -> ${c.siren === 1 ? 'BẬT' : 'TẮT'}`, 'cmd');
+                    }
+                    if(prevControls.irrigation !== null && prevControls.irrigation !== c.irrigation) {
+                        addConsoleLog(`COMMAND: Lệnh tưới công viên thay đổi -> ${c.irrigation === 1 ? 'BẬT' : 'TẮT'}`, 'cmd');
+                    }
+                    if(prevControls.streetLight !== null && prevControls.streetLight !== c.streetLight) {
+                        addConsoleLog(`COMMAND: Lệnh hệ thống đèn đường thay đổi -> ${c.streetLight === 1 ? 'BẬT' : 'TẮT'}`, 'cmd');
+                    }
+                    
+                    prevControls.siren = c.siren;
+                    prevControls.irrigation = c.irrigation;
+                    prevControls.streetLight = c.streetLight;
+
+                    updateUI('siren', c.siren === 1); 
+                    updateUI('irrigation', c.irrigation === 1); 
+                    updateUI('streetLight', c.streetLight === 1); 
+                }
+            });
+
+            onValue(ref(db, 'SmartCity/ThuDuc/Sensors'), (snap) => {
+                const s = snap.val();
+                if (s) {
+                    let temp = s.temp !== undefined ? s.temp : 0;
+                    let humi = s.humi !== undefined ? s.humi : 0;
+                    let gas = s.gas !== undefined ? s.gas : 0;
+                    pushLiveSensorData(temp, humi, gas);
+                }
+            });
+        }
+
+        listenToFirebase(); 
+    </script>
+</body>
+</html>
